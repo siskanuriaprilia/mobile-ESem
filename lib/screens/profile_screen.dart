@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import '../controllers/auth_controller.dart';
 import '../services/api_service.dart';
@@ -147,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.green,
         ),
       );
     } finally {
@@ -169,79 +168,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> changeProfilePicture() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.single.bytes != null) {
-        setState(() {
-          profileImageBytes = result.files.single.bytes;
-        });
-        
-        // Simpan ke API
-        await _uploadProfileImage(result.files.single.bytes!);
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Foto profil berhasil diubah'),
-              ],
-            ),
-            backgroundColor: const Color(0xFF9DD79D),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error memilih foto: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+  // Widget untuk menampilkan avatar default laki-laki
+  Widget _buildDefaultMaleAvatar() {
+    return Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF9DD79D),
+            Color(0xFF7EC97E),
+          ],
         ),
-      );
-    }
-  }
-
-  Future<void> _uploadProfileImage(Uint8List imageBytes) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString("token");
-      
-      if (token == null) return;
-
-      // Convert image to base64
-      String base64Image = base64Encode(imageBytes);
-      
-      final response = await ApiService.postAuth("/upload-profile-image", {
-        'image': base64Image,
-        'filename': 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      }, token);
-
-      final result = jsonDecode(response.body);
-      if (result['success'] == true) {
-        // Update image URL
-        setState(() {
-          profileImageUrl = result['image_url'] ?? "";
-        });
-      }
-    } catch (e) {
-      print('Error uploading image: $e');
-    }
+      ),
+      child: Center(
+        child: Icon(
+          Icons.person,
+          size: 70,
+          color: Colors.white.withOpacity(0.9),
+        ),
+      ),
+    );
   }
 
   void showEditDialog(String field, TextEditingController controller, String fieldKey) {
@@ -369,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               Text(
                 'Menyimpan ${_getFieldDisplayName(fieldKey)}...',
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 10),
               ),
             ],
           ),
@@ -576,19 +526,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  String _getFieldKeyForApi(String fieldKey) {
-    switch (fieldKey) {
-      case "nama":
-        return "user_name";
-      case "alamat":
-        return "address";
-      case "telepon":
-        return "user_phone";
-      default:
-        return fieldKey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -712,57 +649,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: Column(
                           children: [
-                            Stack(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF9DD79D).withOpacity(0.3),
-                                        blurRadius: 20,
-                                        spreadRadius: 5,
-                                      ),
-                                    ],
+                            // Avatar tanpa tombol edit
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF9DD79D).withOpacity(0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
                                   ),
-                                  child: CircleAvatar(
-                                    radius: 60,
-                                    backgroundColor: Colors.grey[300],
-                                    backgroundImage: profileImageBytes != null
-                                        ? MemoryImage(profileImageBytes!)
-                                        : (profileImageUrl.isNotEmpty
-                                            ? NetworkImage(profileImageUrl) as ImageProvider
-                                            : const AssetImage('assets/images/default_profile.png')),
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: GestureDetector(
-                                    onTap: changeProfilePicture,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF9DD79D),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 3),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: profileImageBytes != null
+                                  ? CircleAvatar(
+                                      radius: 60,
+                                      backgroundImage: MemoryImage(profileImageBytes!),
+                                    )
+                                  : profileImageUrl.isNotEmpty
+                                      ? CircleAvatar(
+                                          radius: 60,
+                                          backgroundImage: NetworkImage(profileImageUrl),
+                                        )
+                                      : _buildDefaultMaleAvatar(),
                             ),
                             const SizedBox(height: 20),
                             Text(
